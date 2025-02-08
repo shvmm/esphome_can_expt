@@ -1,0 +1,33 @@
+substitutions:
+  # +--------------------------------------+
+  # | ESP32 CAN/TWAI/serial port pins      |
+  # +--------------------------------------+
+  # GPIO pins your CAN bus transceiver (TJA1050, TJA1051T or SN65HVD230) is connected to the ESP32 TX->TX and RX->RX !
+  can_tx_pin: GPIO14
+  can_rx_pin: GPIO15
+
+
+esphome:
+  name: "espcanbms"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+# Blink the blue LED
+output:
+  - platform: gpio
+    pin: GPIO33
+    id: led
+    inverted: false
+
+light:
+  - platform: binary
+    output: led
+    id: blue_led
+    name: "Blue LED"
+    internal: true

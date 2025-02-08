@@ -1,0 +1,61 @@
+substitutions:
+  name: xiaos3can
+  # +--------------------------------------+
+  # | ESP32 CAN/TWAI/serial port pins      |
+  # +--------------------------------------+
+  # GPIO pins your CAN bus transceiver (TJA1050, TJA1051T or SN65HVD230) is connected to the ESP32 TX->TX and RX->RX !
+  can_tx_pin: GPIO05
+  can_rx_pin: GPIO04
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 8MB # adjust according to your ESP32-S3 version
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      COMPILER_OPTIMIZATION_SIZE: y
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: y
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+esphome:
+  name: ${name}
+  # ha_name: shvmjk
+  platformio_options:
+    # board_build.f_cpu: 240000000L
+    # board_build.f_flash: 80000000L
+    # use Dual IO (dio) instead of Quad IO (qio) to prevent boot loop after flashing
+    board_build.flash_mode: dio
+    # upload_speed: 921600
+    
+    # build_flags: -DBOARD_HAS_PSRAM
+    # board_build.arduino.memory_type: qio_opi
+
+# psram:
+#   mode: octal
+#   speed: 80MHz
+
+logger:
+  # hardware_uart: USB_SERIAL_JTAG
+  level: DEBUG
+
+# +--------------------------------------+
+# | Inverter Heartbeat Light             |
+# +--------------------------------------+
+
+light:
+  # ESP Light used to see the inverter heartbeat
+  # Internal : only specifying an id without a name will implicitly set this to true.
+  - platform: binary
+    output: esp_led
+    id: esp_light
+
+output:
+  # ESP LED
+  - platform: gpio
+    pin: 21
+    id: esp_led
+    inverted: true

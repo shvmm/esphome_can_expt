@@ -1,0 +1,121 @@
+substitutions:
+  # +--------------------------------------+
+  # | ESP32 CAN/TWAI/serial port pins      |
+  # +--------------------------------------+
+  # GPIO pins your CAN bus transceiver (TJA1050, TJA1051T or SN65HVD230) is connected to the ESP32 TX->TX and RX->RX !
+  can_tx_pin: GPIO23
+  can_rx_pin: GPIO22
+
+
+esphome:
+  name: "espcanbms"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+api:
+  reboot_timeout: 0s
+
+logger:
+  level: DEBUG
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# Blink the blue LED
+output:
+  - platform: gpio
+    pin: 2
+    id: led
+    inverted: true
+
+light:
+  - platform: binary
+    output: led
+    id: blue_led
+    name: "Blue LED"
+    internal: true
+
+interval:
+  - interval: 4s
+    then:
+      - canbus.send:
+          # Extended ID explicit
+          use_extended_id: true
+          can_id: 0x100
+          data: [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x09]
+      - canbus.send:
+          # Standard ID by default
+          can_id: 0x100
+          data: [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
+  
+  - interval: 2s
+    startup_delay: 1s
+    then:
+      # Standard ID by default
+      - canbus.send:
+          can_id: 0x300
+          data: [0]
+      - canbus.send:
+          can_id: 0x351
+          data: [0x16, 0x02, 0x00, 0x00, 0x20, 0x03, 0xe0, 0x01]
+      - canbus.send:
+          can_id: 0x355
+          data: [0x62, 0x00, 0x5f, 0x00, 0x8e, 0x0d, 0x8a, 0x0d]
+      - canbus.send:
+          can_id: 0x356
+          data: [0xae, 0x15, 0x00, 0x00, 0x4b, 0x01, 0x36, 0x01]
+      - canbus.send:
+          can_id: 0x359
+          data: [0x00, 0x00, 0x00, 0x00, 0x01, 0x69, 0x00]
+      - canbus.send:
+          can_id: 0x35c
+          data: [0xc0, 0x00, 0xbd, 0x00]
+      - canbus.send:
+          can_id: 0x35e
+          # ASCII TEXT: __SHVM__ , underscores denote whitespace
+          data: [0x20, 0x20, 0x53, 0x48, 0x56, 0x4D, 0x20, 0x20]
+      
+
+
+canbus:
+  - platform: esp32_can
+    id: canbms
+    tx_pin: ${can_tx_pin}
+    rx_pin: ${can_rx_pin}
+    can_id: 4
+    bit_rate: 125kbps
+    # bit_rate: 500kbps
+    on_frame:
+    - can_id: 4
+      then:
+        - lambda: |-
+            ESP_LOGI("main", "Received CAN ID: 4 = %c%c%c%c%c%c%c%c", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]);
+    - can_id: 0x305 # Inverter ACK 00 00 00 00 00 00 00 00 - LXP reply
+      then:
+        - lambda: |-
+            ESP_LOGI("main", "Received CAN ID: 0x305 ACK");
+        - light.toggle:
+            id: blue_led
+            
+
+# Standard IDs use 0x000 to 0x7ff (hexadecimal) or 0 to 2047 (decimal)
+# Extended IDs use 0x00000000 to 0x1fffffff (hexadecimal) or 0 to 536870911 (decimal)
+
+# 0b00000000000000000000001000000 0x        40
+# 0b11111000000000011111111000000 0x 1F00 3FC0
+# if(x.size() > 0) {
+#                 auto call = id(TestCover).make_call();
+#                 switch(x[0]) {
+#                   case 0x2: call.set_command_open(); call.perform(); break; // long press
+#                   case 0x1:                                                 // button press
+#                   case 0x3: call.set_command_stop(); call.perform(); break; // long release
+#                   case 0x4: call.set_position(1.0); call.perform(); break;  // double-click
+#                 }
+#               }

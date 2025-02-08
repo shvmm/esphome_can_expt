@@ -1,0 +1,144 @@
+substitutions:
+  # +--------------------------------------+
+  # | ESP32 CAN/TWAI/serial port pins      |
+  # +--------------------------------------+
+  # GPIO pins your CAN bus transceiver (TJA1050, TJA1051T or SN65HVD230) is connected to the ESP32 TX->TX and RX->RX !
+  can_tx_pin: GPIO23
+  can_rx_pin: GPIO22
+
+esphome:
+  name: "espcaninv"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  level: DEBUG
+
+# select:
+#   - platform: template
+#     name: Mode
+#     id: mode
+#     options:
+#      - "Option1A"
+#      - "Option2B"
+#      - "Option3C"
+#      - "Option4D"
+#     initial_option: "Option1A"
+#     optimistic: true
+
+
+# Blink the blue LED
+# output:
+#   - platform: gpio
+#     pin: 2
+#     id: led
+#     inverted: true
+
+# light:
+#   - platform: binary
+#     output: led
+#     id: blue_led
+#     name: "Blue LED"
+#     internal: true
+
+
+canbus:
+  - platform: esp32_can
+    id: caninv
+    tx_pin: ${can_tx_pin}
+    rx_pin: ${can_rx_pin}
+    can_id: 4 # Standard from 0x000 to 0x7ff here 0x004 default
+    bit_rate: 125kbps
+    # bit_rate: 500kbps
+    on_frame:    
+    
+
+    # Complete LXP/EG4 protocol decode
+    - can_id: 0x300
+      then:
+        - lambda: |-
+            if(x[0]) {
+              ESP_LOGI("main", "Rx CAN ID: 0x300 Byte0bit0 YES RSD Batt");
+            }
+            else ESP_LOGI("main", "Rx CAN ID: 0x300 Byte0bit0 NO RSD Batt");
+    - can_id: 0x359
+      then:
+        - lambda: |-            
+            uint16_t capacity = x[5] + (x[6] << 8);
+
+            ESP_LOGI("main", "CAN ID 0x359 Protect1 %x", x[0]);
+            ESP_LOGI("main", "CAN ID 0x359 Protect2 %x", x[1]);
+            ESP_LOGI("main", "CAN ID 0x359 Alarm1 %x", x[2]);
+            ESP_LOGI("main", "CAN ID 0x359 Alarm2 %x", x[3]);
+            
+            ESP_LOGI("main", "CAN ID 0x359 ModuleNum %u", x[4]);
+            ESP_LOGI("main", "CAN ID 0x359 Capacity %u Ah", capacity);
+    - can_id: 0x351
+      then:
+        - lambda: |-
+            uint16_t cvl = x[0] + (x[1] << 8);
+            uint16_t ccl = x[2] + (x[3] << 8);
+            int16_t dcl = x[4] + (x[5] << 8);
+            int16_t dvl = x[6] + (x[7] << 8);
+            
+            // Values preserved for use in digital domain | nofloat
+            ESP_LOGI("main", "CAN ID 0x351 CCL %u ×0.1 Volt", cvl);
+            ESP_LOGI("main", "CAN ID 0x351 CVL %u ×0.1 Amps", ccl);
+            ESP_LOGI("main", "CAN ID 0x351 DCL %u ×0.1 Amps", dcl);
+            ESP_LOGI("main", "CAN ID 0x351 DVL %u ×0.1 Volt", dvl);
+    - can_id: 0x355
+      then:
+        - lambda: |-
+            uint16_t soc = x[0] + (x[1] << 8);
+            uint16_t soh = x[2] + (x[3] << 8);
+            int16_t max_cell_v = x[4] + (x[5] << 8);
+            int16_t min_cell_v = x[6] + (x[7] << 8);
+            
+            // Values preserved for use in digital domain | nofloat
+            ESP_LOGI("main", "CAN ID 0x355 SOC %u %%", soc);
+            ESP_LOGI("main", "CAN ID 0x355 SOH %u %%", soh);
+            ESP_LOGI("main", "CAN ID 0x355 Max Cell_V %d mV", max_cell_v);
+            ESP_LOGI("main", "CAN ID 0x355 Min Cell_V %d mV", min_cell_v);
+    - can_id: 0x356
+      then:
+        - lambda: |-
+            uint16_t voltage = x[0] + (x[1] << 8);
+            uint16_t current = x[2] + (x[3] << 8);
+            int16_t maxt = x[4] + (x[5] << 8) - 1; // Mitigation for 0.1C extra sent as max
+            int16_t mint = x[6] + (x[7] << 8);
+            
+            // Values preserved for use in digital domain | nofloat
+            ESP_LOGI("main", "CAN ID 0x356 %u ×0.01 Volt", voltage);
+            ESP_LOGI("main", "CAN ID 0x356 %u ×0.1 Amps", current);
+            ESP_LOGI("main", "CAN ID 0x356 %d ×0.1 C", maxt);
+            ESP_LOGI("main", "CAN ID 0x356 %d ×0.1 C", mint);
+        - canbus.send:
+            can_id: 0x305
+            data: []
+            # data: [0, 0, 0, 0, 0, 0, 0, 1]
+    - can_id: 0x35C
+      then:
+        - lambda: |-
+            ESP_LOGI("main", "Rx CAN ID: 0x35C Request Flag = %x", x[0]);
+            
+            ESP_LOGI("main", "CAN ID: 0x35C cycle count = %u", x[2] + (x[3] << 8));
+    - can_id: 0x35E
+      then:
+        - lambda: |-
+            ESP_LOGI("main", "Rx CAN ID: 0x35E = %c%c%c%c%c%c%c%c", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]);    
+    
+    - can_id: 0x100
+      use_extended_id: true
+      then:
+        - lambda: |-
+            std::string b(x.begin(), x.end());
+            ESP_LOGI("CAN extend ID 0x100", "%s", &b[0]);
+    - can_id: 0x100
+      use_extended_id: false
+      then:
+        - lambda: |-
+            std::string b(x.begin(), x.end());
+            ESP_LOGI("CAN standard ID 0x100", "%s", &b[0]);

@@ -1,0 +1,114 @@
+substitutions:
+  # +--------------------------------------+
+  # | ESP32 CAN/TWAI/serial port pins      |
+  # +--------------------------------------+
+  # GPIO pins your CAN bus transceiver (TJA1050, TJA1051T or SN65HVD230) is connected to the ESP32 TX->TX and RX->RX !
+  can_tx_pin: GPIO23
+  can_rx_pin: GPIO22
+
+
+esphome:
+  name: "canrxalltest"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+# Blink the blue LED
+output:
+  - platform: gpio
+    pin: 2
+    id: led
+    inverted: true
+
+# switch:
+#   - platform: template
+#     name: "Enable Extended"
+#     id: extend_on
+#     optimistic: true
+
+
+light:
+  - platform: binary
+    output: led
+    id: blue_led
+    name: "Blue LED"
+    internal: true
+
+# interval:
+#   - interval: 4s
+#     then:
+#       - canbus.send:
+#           # Extended ID explicit
+#           use_extended_id: true
+#           can_id: 0x100
+#           data: [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x09]
+#       - canbus.send:
+#           # Standard ID by default
+#           can_id: 0x100
+#           data: [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
+#   - interval: 2s
+#     startup_delay: 1s
+#     then:
+#       - canbus.send:
+#           # Standard ID by default
+#           can_id: 0x356
+#           data: [0xae, 0x15, 0x0, 0x0, 0x4b, 0x01, 0x36, 0x01]
+#       - canbus.send:
+#           # Standard ID by default
+#           can_id: 0x351
+#           data: [0x16, 0x02, 0x00, 0x00, 0x20, 0x03, 0xe0, 0x01]
+
+canbus:
+  - platform: esp32_can
+    id: canbms
+    tx_pin: ${can_tx_pin}
+    rx_pin: ${can_rx_pin}
+    can_id: 4
+    bit_rate: 500kbps
+    
+    # lambda: |-
+    #   ESP_LOGI("main", "RX CAN ID: %x = %x %x %x %x %x %x %x %x", can_id, x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]);
+
+    # - can_id: 0  # listen to all messages
+    #   can_id_mask: 0
+    #   use_extended_id: true
+    #   then:
+    #     - light.toggle:
+    #         id: blue_led
+    #     - lambda: |-
+    #         ESP_LOGI("main", "RX CAN ID: %x = %x %x %x %x %x %x %x %x", can_id, x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]);
+
+
+
+
+
+          # - lambda: |-
+          #     ESP_LOGI("main", "Received CAN content = %c%c%c%c%c%c%c%c", x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]);
+          #     char buf[29];
+          #     // DGN
+          #     // Source Address (SA)
+          #     // Priority
+          #     // Data (8 bytes)
+          #     int dgn = (can_id >>8) & 0x1ffff;
+          #     int pri = (can_id >> 26) & 0b111;
+          #     int sa  = can_id & 0xff;
+          #     snprintf((char*)&buf, sizeof(buf), "%05X,%02X,%1X,%02X%02X%02X%02X%02X%02X%02X%02X", dgn, sa, pri, x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]);
+          #     //id(rvc_rx).publish_state((const char*)&buf);
+          #     ESP_LOGI("can", "%s", (const char*)&buf);
+
+# 0b00000000000000000000001000000 0x        40
+# 0b11111000000000011111111000000 0x 1F00 3FC0
+# if(x.size() > 0) {
+#                 auto call = id(TestCover).make_call();
+#                 switch(x[0]) {
+#                   case 0x2: call.set_command_open(); call.perform(); break; // long press
+#                   case 0x1:                                                 // button press
+#                   case 0x3: call.set_command_stop(); call.perform(); break; // long release
+#                   case 0x4: call.set_position(1.0); call.perform(); break;  // double-click
+#                 }
+#               }
